@@ -42,7 +42,7 @@ extern "C" {
  * These settings should not be altered.
  *-----------------------------------------------------------
  */
-
+#include "FreeRTOSConfig.h"
 /* Type definitions. */
 #define portCHAR		char
 #define portFLOAT		float
@@ -51,6 +51,10 @@ extern "C" {
 #define portSHORT		short
 #define portSTACK_TYPE	uint32_t
 #define portBASE_TYPE	long
+
+//rcli
+#define pdFALSE			( ( BaseType_t ) 0 )
+#define pdTRUE			( ( BaseType_t ) 1 )
 
 typedef portSTACK_TYPE StackType_t;
 typedef long BaseType_t;
@@ -75,6 +79,14 @@ typedef unsigned long UBaseType_t;
 #define portBYTE_ALIGNMENT			8
 /*-----------------------------------------------------------*/
 
+/*-----------------------------RCLI----------------------------------------*/
+//#if (defined CONFIG_NT_RCLI)
+//#define pdFALSE			( ( BaseType_t ) 0 )
+//#define pdTRUE			( ( BaseType_t ) 1 )
+//#endif
+/*-----------------------------RCLI----------------------------------------*/
+
+
 /* Scheduler utilities. */
 #define portYIELD() 															\
 {																				\
@@ -89,7 +101,8 @@ typedef unsigned long UBaseType_t;
 
 #define portNVIC_INT_CTRL_REG		( * ( ( volatile uint32_t * ) 0xe000ed04 ) )
 #define portNVIC_PENDSVSET_BIT		( 1UL << 28UL )
-#define portEND_SWITCHING_ISR( xSwitchRequired ) if( xSwitchRequired != pdFALSE ) portYIELD()
+//#define portEND_SWITCHING_ISR( xSwitchRequired ) if( xSwitchRequired != pdFALSE ) portYIELD()
+#define portEND_SWITCHING_ISR( xSwitchRequired ) { if( xSwitchRequired != pdFALSE ) { traceISR_EXIT_TO_SCHEDULER(); portYIELD(); } else { traceISR_EXIT(); } }
 #define portYIELD_FROM_ISR( x ) portEND_SWITCHING_ISR( x )
 /*-----------------------------------------------------------*/
 
@@ -126,6 +139,10 @@ not necessary for to use this port.  They are defined so the common demo files
 
 #if configUSE_PORT_OPTIMISED_TASK_SELECTION == 1
 
+	//peter to avoid warning
+	#pragma GCC diagnostic push
+	#pragma GCC diagnostic ignored "-Wattributes"
+	#pragma GCC diagnostic ignored "-Wunused-function"
 	/* Generic helper function. */
 	__attribute__( ( always_inline ) ) static inline uint8_t ucPortCountLeadingZeros( uint32_t ulBitmap )
 	{
@@ -134,7 +151,7 @@ not necessary for to use this port.  They are defined so the common demo files
 		__asm volatile ( "clz %0, %1" : "=r" ( ucReturn ) : "r" ( ulBitmap ) : "memory" );
 		return ucReturn;
 	}
-
+	#pragma GCC diagnostic pop
 	/* Check the configuration. */
 	#if( configMAX_PRIORITIES > 32 )
 		#error configUSE_PORT_OPTIMISED_TASK_SELECTION can only be set to 1 when configMAX_PRIORITIES is less than or equal to 32.  It is very rare that a system requires more than 10 to 15 difference priorities as tasks that share a priority will time slice.
@@ -165,9 +182,13 @@ not necessary for to use this port.  They are defined so the common demo files
 #ifndef portFORCE_INLINE
 	#define portFORCE_INLINE inline __attribute__(( always_inline))
 #endif
-
+	//peter to avoid warning
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wattributes"
+#pragma GCC diagnostic ignored "-Wunused-function"
 portFORCE_INLINE static BaseType_t xPortIsInsideInterrupt( void )
 {
+#pragma GCC diagnostic pop
 uint32_t ulCurrentInterrupt;
 BaseType_t xReturn;
 
@@ -187,9 +208,13 @@ BaseType_t xReturn;
 }
 
 /*-----------------------------------------------------------*/
-
+//peter to avoid warning
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wattributes"
+#pragma GCC diagnostic ignored "-Wunused-function"
 portFORCE_INLINE static void vPortRaiseBASEPRI( void )
 {
+#pragma GCC diagnostic pop
 uint32_t ulNewBASEPRI;
 
 	__asm volatile
@@ -203,9 +228,13 @@ uint32_t ulNewBASEPRI;
 }
 
 /*-----------------------------------------------------------*/
-
+//peter to avoid warning
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wattributes"
+#pragma GCC diagnostic ignored "-Wunused-function"
 portFORCE_INLINE static uint32_t ulPortRaiseBASEPRI( void )
 {
+#pragma GCC diagnostic pop
 uint32_t ulOriginalBASEPRI, ulNewBASEPRI;
 
 	__asm volatile
@@ -223,9 +252,13 @@ uint32_t ulOriginalBASEPRI, ulNewBASEPRI;
 	return ulOriginalBASEPRI;
 }
 /*-----------------------------------------------------------*/
-
+//peter to avoid warning
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wattributes"
+#pragma GCC diagnostic ignored "-Wunused-function"
 portFORCE_INLINE static void vPortSetBASEPRI( uint32_t ulNewMaskValue )
 {
+#pragma GCC diagnostic pop
 	__asm volatile
 	(
 		"	msr basepri, %0	" :: "r" ( ulNewMaskValue ) : "memory"

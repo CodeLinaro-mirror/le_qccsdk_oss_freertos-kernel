@@ -1286,6 +1286,23 @@ BaseType_t xTimerGenericCommand( TimerHandle_t xTimer, const BaseType_t xCommand
 	UBaseType_t uxTimerGetTimerNumber( TimerHandle_t xTimer ) PRIVILEGED_FUNCTION;
 #endif
 
+/*****************************************************************
+* @brief Routine to check if the given task Handle belongs to timer 
+* task
+* @param task_handle : handle of the task to be checked
+* @return 1 if its timer handle, 0 otherwise
+****************************************************************/
+
+BaseType_t xIsTimertaskHandle (TaskHandle_t task_handle);
+
+/**************************************************************
+ * prvGetHeadTimerCallback
+ * @brief return the NT timer callback
+ * @param None 
+ * @return Timer callback
+ *************************************************************/
+TimerCallbackFunction_t xGetHeadTimerCallback (void);
+
 #ifdef __cplusplus
 }
 #endif

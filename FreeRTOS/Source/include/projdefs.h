@@ -56,7 +56,7 @@ definition here is not suitable for your application. */
 
 /* Macros used for basic data corruption checks. */
 #ifndef configUSE_LIST_DATA_INTEGRITY_CHECK_BYTES
-	#define configUSE_LIST_DATA_INTEGRITY_CHECK_BYTES 0
+	#define configUSE_LIST_DATA_INTEGRITY_CHECK_BYTES 1
 #endif
 
 #if( configUSE_16_BIT_TICKS == 1 )

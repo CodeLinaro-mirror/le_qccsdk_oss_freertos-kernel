@@ -86,7 +86,8 @@ r0p1 port. */
 #define portASPEN_AND_LSPEN_BITS			( 0x3UL << 30UL )
 
 /* Constants required to set up the initial stack. */
-#define portINITIAL_XPSR					( 0x01000000 )
+
+#define portINITIAL_XPSR					( 0x01000000UL)//peter previous value 0x01000000
 #define portINITIAL_EXC_RETURN				( 0xfffffffd )
 
 /* The systick is a 24-bit counter. */
@@ -427,6 +428,13 @@ void vPortExitCritical( void )
 	}
 }
 /*-----------------------------------------------------------*/
+/*
+ * Dummy function added to avoid compiler optimizing out the symbol used in inline assembly
+ */
+static void __attribute__ ((used)) vPortNoOptimize()
+{
+	vTaskSwitchContext();
+}
 
 void xPortPendSVHandler( void )
 {
@@ -492,14 +500,20 @@ void xPortSysTickHandler( void )
 	save and then restore the interrupt mask value as its value is already
 	known. */
 	portDISABLE_INTERRUPTS();
+    traceISR_ENTER();
 	{
 		/* Increment the RTOS tick. */
 		if( xTaskIncrementTick() != pdFALSE )
 		{
+            traceISR_EXIT_TO_SCHEDULER();
 			/* A context switch is required.  Context switching is performed in
 			the PendSV interrupt.  Pend the PendSV interrupt. */
 			portNVIC_INT_CTRL_REG = portNVIC_PENDSVSET_BIT;
 		}
+		else
+		{
+			traceISR_EXIT();
+		}        
 	}
 	portENABLE_INTERRUPTS();
 }

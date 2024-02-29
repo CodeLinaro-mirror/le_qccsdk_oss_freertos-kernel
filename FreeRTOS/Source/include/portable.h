@@ -84,6 +84,14 @@ must be set in the compiler's include path. */
 	#define portNUM_CONFIGURABLE_REGIONS 1
 #endif
 
+#ifndef portHAS_STACK_OVERFLOW_CHECKING
+	#define portHAS_STACK_OVERFLOW_CHECKING 0
+#endif
+
+#ifndef portARCH_NAME
+	#define portARCH_NAME NULL
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -110,12 +118,25 @@ extern "C" {
 	#endif
 #endif
 
-/* Used by heap_5.c. */
+/* Used by heap_5.c to define the start address and size of each memory region
+that together comprise the total FreeRTOS heap space. */
 typedef struct HeapRegion
 {
 	uint8_t *pucStartAddress;
 	size_t xSizeInBytes;
 } HeapRegion_t;
+
+/* Used to pass information about the heap out of vPortGetHeapStats(). */
+typedef struct xHeapStats
+{
+	size_t xAvailableHeapSpaceInBytes;		/* The total heap size currently available - this is the sum of all the free blocks, not the largest block that can be allocated. */
+	size_t xSizeOfLargestFreeBlockInBytes; 	/* The maximum size, in bytes, of all the free blocks within the heap at the time vPortGetHeapStats() is called. */
+	size_t xSizeOfSmallestFreeBlockInBytes; /* The minimum size, in bytes, of all the free blocks within the heap at the time vPortGetHeapStats() is called. */
+	size_t xNumberOfFreeBlocks;				/* The number of free memory blocks within the heap at the time vPortGetHeapStats() is called. */
+	size_t xMinimumEverFreeBytesRemaining;	/* The minimum amount of total free memory (sum of all free blocks) there has been in the heap since the system booted. */
+	size_t xNumberOfSuccessfulAllocations;	/* The number of calls to pvPortMalloc() that have returned a valid memory block. */
+	size_t xNumberOfSuccessfulFrees;		/* The number of calls to vPortFree() that has successfully freed a block of memory. */
+} HeapStats_t;
 
 /*
  * Used to define multiple heap regions for use by heap_5.c.  This function
@@ -130,12 +151,49 @@ typedef struct HeapRegion
  */
 void vPortDefineHeapRegions( const HeapRegion_t * const pxHeapRegions ) PRIVILEGED_FUNCTION;
 
+/*
+ * Returns a HeapStats_t structure filled with information about the current
+ * heap state.
+ */
+void vPortGetHeapStats( HeapStats_t *pxHeapStats );
 
 /*
  * Map to the memory management routines required for the port.
  */
+#ifndef CONFIG_HEAP_STATISTIC
 void *pvPortMalloc( size_t xSize ) PRIVILEGED_FUNCTION;
 void vPortFree( void *pv ) PRIVILEGED_FUNCTION;
+#else
+
+#ifndef pvPortMalloc
+#ifndef mem_heap_statistics_type
+#define mem_heap_statistics_type mem_heap_statistics_type
+typedef struct mem_heap_statistics {
+  const char *function;
+  unsigned int req_size;
+}mem_heap_statistics_type;
+#endif
+
+extern unsigned int heap_statistics_index;
+extern mem_heap_statistics_type heap_statistics[];
+
+void *__pvPortMalloc( size_t xWantedSize );
+
+#define pvPortMalloc(size) (({heap_statistics[heap_statistics_index%NT_HEAP_RCD_CNT].function=__FUNCTION__; \
+                                            heap_statistics[heap_statistics_index%NT_HEAP_RCD_CNT].req_size=size; \
+                                            heap_statistics_index++;}) , \
+                                         (__pvPortMalloc(size)))
+#endif
+
+#ifndef vPortFree
+extern unsigned int heap_statistics_free_index;
+extern const char *heap_statistics_free[];                                         
+void __vPortFree(  void *ptr );
+#define vPortFree(ptr) (({heap_statistics_free[heap_statistics_free_index%NT_HEAP_RCD_CNT]=__FUNCTION__; \
+                                            heap_statistics_free_index++;}) , \
+                                         (__vPortFree(ptr)))
+#endif
+#endif
 void vPortInitialiseBlocks( void ) PRIVILEGED_FUNCTION;
 size_t xPortGetFreeHeapSize( void ) PRIVILEGED_FUNCTION;
 size_t xPortGetMinimumEverFreeHeapSize( void ) PRIVILEGED_FUNCTION;

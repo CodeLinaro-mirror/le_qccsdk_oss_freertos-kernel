@@ -43,6 +43,17 @@ task.h is included from an application file. */
 #include "FreeRTOS.h"
 #include "task.h"
 
+#include "nt_flags.h"
+
+extern unsigned char _ln_RAM_addr_heap_start__;
+
+#ifdef PLATFORM_FERMION
+#define HEAP_END_ADDR   ( 0x9FFFF )
+#else
+#define HEAP_END_ADDR	( 0x7FFFF )
+#endif //PLATFORM_FERMION
+
+#if (NT_FN_QC_HEAP == 0)
 #undef MPU_WRAPPERS_INCLUDED_FROM_API_FILE
 
 #if( configSUPPORT_DYNAMIC_ALLOCATION == 0 )
@@ -61,7 +72,12 @@ task.h is included from an application file. */
 	heap - probably so it can be placed in a special segment or address. */
 	extern uint8_t ucHeap[ configTOTAL_HEAP_SIZE ];
 #else
-	static uint8_t ucHeap[ configTOTAL_HEAP_SIZE ];
+
+/*	FreeRTOS heap declaration overridden for Neutrino	*/
+// static uint8_t ucHeap[ configTOTAL_HEAP_SIZE ] __attribute__((section(".heap")));
+
+/* Beginning address of the heap is provided by the linker */
+	static uint8_t *ucHeap __attribute__((section(".heap"))) = &_ln_RAM_addr_heap_start__;
 #endif /* configAPPLICATION_ALLOCATED_HEAP */
 
 /* Define the linked list structure.  This is used to link free blocks in order
@@ -70,7 +86,19 @@ typedef struct A_BLOCK_LINK
 {
 	struct A_BLOCK_LINK *pxNextFreeBlock;	/*<< The next free block in the list. */
 	size_t xBlockSize;						/*<< The size of the free block. */
+#ifdef NT_TU_HEAP_STATS
+	UBaseType_t TaskId;						/* Added for identifying the task performing malloc and free. */
+#endif
 } BlockLink_t;
+
+#ifdef NT_TU_HEAP_STATS
+UBaseType_t ulTaskId = 0;	//Used for updating/retrieving the Task ID into heap structure
+static int curr_total_usage = 0;	//current usage from total heap
+ int max_total_usage = 0;		//Maximum usage from total heap
+ int CurrTotalUsagePerStep = 0;
+ int MaxTotalUsagePerStep = 0;
+UBaseType_t SchedulerState = NULL;
+#endif //NT_TU_HEAP_STATS
 
 /*-----------------------------------------------------------*/
 
@@ -97,10 +125,12 @@ static const size_t xHeapStructSize	= ( sizeof( BlockLink_t ) + ( ( size_t ) ( p
 /* Create a couple of list links to mark the start and end of the list. */
 static BlockLink_t xStart, *pxEnd = NULL;
 
-/* Keeps track of the number of free bytes remaining, but says nothing about
-fragmentation. */
+/* Keeps track of the number of calls to allocate and free memory as well as the
+number of free bytes remaining, but says nothing about fragmentation. */
 static size_t xFreeBytesRemaining = 0U;
 static size_t xMinimumEverFreeBytesRemaining = 0U;
+static size_t xNumberOfSuccessfulAllocations = 0;
+static size_t xNumberOfSuccessfulFrees = 0;
 
 /* Gets set to the top bit of an size_t type.  When this bit in the xBlockSize
 member of an BlockLink_t structure is set then the block belongs to the
@@ -207,7 +237,38 @@ void *pvReturn = NULL;
 					}
 
 					xFreeBytesRemaining -= pxBlock->xBlockSize;
+#ifdef NT_TU_HEAP_STATS
+					curr_total_usage += pxBlock->xBlockSize;	//Updating total heap usage
 
+					if(max_total_usage < curr_total_usage)		//Updating highest heap usage
+					{
+						max_total_usage = curr_total_usage;
+					}
+
+					CurrTotalUsagePerStep += pxBlock->xBlockSize;
+
+					if(MaxTotalUsagePerStep < CurrTotalUsagePerStep)
+					{
+						MaxTotalUsagePerStep = CurrTotalUsagePerStep;
+					}
+
+
+					/* Get the Task ID and update in the heap structure before updating the heap utility table */
+					ulTaskId = xTaskGetCurrentTaskId();
+					SchedulerState = xTaskGetSchedulerState();
+					/* Retrieving the Task Id from the heap structure to free the memory allocated for the respective task */
+					if(SchedulerState == taskSCHEDULER_NOT_STARTED)
+					{
+						ulTaskId = 0;
+						nt_table_update_malloc(pxBlock->xBlockSize,SchedulerState,ulTaskId);
+					}
+					else
+					{
+						pxBlock->TaskId = ulTaskId;
+						nt_table_update_malloc(pxBlock->xBlockSize,SchedulerState,ulTaskId);
+					}
+
+#endif
 					if( xFreeBytesRemaining < xMinimumEverFreeBytesRemaining )
 					{
 						xMinimumEverFreeBytesRemaining = xFreeBytesRemaining;
@@ -221,6 +282,7 @@ void *pvReturn = NULL;
 					by the application and has no "next" block. */
 					pxBlock->xBlockSize |= xBlockAllocatedBit;
 					pxBlock->pxNextFreeBlock = NULL;
+					xNumberOfSuccessfulAllocations++;
 				}
 				else
 				{
@@ -290,8 +352,30 @@ BlockLink_t *pxLink;
 				{
 					/* Add this block to the list of free blocks. */
 					xFreeBytesRemaining += pxLink->xBlockSize;
+#ifdef NT_TU_HEAP_STATS
+
+					curr_total_usage -= pxLink->xBlockSize;	//Updating total heap usage
+
+					CurrTotalUsagePerStep -= pxLink->xBlockSize;
+
+					SchedulerState = xTaskGetSchedulerState();
+
+					/* Retrieving the Task Id from the heap structure to free the memory allocated for the respective task */
+					if(SchedulerState == taskSCHEDULER_NOT_STARTED)
+					{
+						ulTaskId = 0;
+						nt_table_update_free(pxLink->xBlockSize,SchedulerState,ulTaskId);
+					}
+					else
+					{
+						ulTaskId = pxLink->TaskId;
+						nt_table_update_free(pxLink->xBlockSize,SchedulerState,ulTaskId);
+					}
+
+#endif
 					traceFREE( pv, pxLink->xBlockSize );
 					prvInsertBlockIntoFreeList( ( ( BlockLink_t * ) pxLink ) );
+					xNumberOfSuccessfulFrees++;
 				}
 				( void ) xTaskResumeAll();
 			}
@@ -331,7 +415,7 @@ static void prvHeapInit( void )
 BlockLink_t *pxFirstFreeBlock;
 uint8_t *pucAlignedHeap;
 size_t uxAddress;
-size_t xTotalHeapSize = configTOTAL_HEAP_SIZE;
+size_t xTotalHeapSize = HEAP_END_ADDR - (uint32_t)&_ln_RAM_addr_heap_start__;
 
 	/* Ensure the heap starts on a correctly aligned boundary. */
 	uxAddress = ( size_t ) ucHeap;
@@ -433,4 +517,59 @@ uint8_t *puc;
 		mtCOVERAGE_TEST_MARKER();
 	}
 }
+/*-----------------------------------------------------------*/
+
+void vPortGetHeapStats( HeapStats_t *pxHeapStats )
+{
+BlockLink_t *pxBlock;
+size_t xBlocks = 0, xMaxSize = 0, xMinSize = portMAX_DELAY; /* portMAX_DELAY used as a portable way of getting the maximum value. */
+
+	vTaskSuspendAll();
+	{
+		pxBlock = xStart.pxNextFreeBlock;
+
+		/* pxBlock will be NULL if the heap has not been initialised.  The heap
+		is initialised automatically when the first allocation is made. */
+		if( pxBlock != NULL )
+		{
+			do
+			{
+				/* Increment the number of blocks and record the largest block seen
+				so far. */
+				xBlocks++;
+
+				if( pxBlock->xBlockSize > xMaxSize )
+				{
+					xMaxSize = pxBlock->xBlockSize;
+				}
+
+				if( pxBlock->xBlockSize < xMinSize )
+				{
+					xMinSize = pxBlock->xBlockSize;
+				}
+
+				/* Move to the next block in the chain until the last block is
+				reached. */
+				pxBlock = pxBlock->pxNextFreeBlock;
+			} while( pxBlock != pxEnd );
+		}
+	}
+	xTaskResumeAll();
+
+	pxHeapStats->xSizeOfLargestFreeBlockInBytes = xMaxSize;
+	pxHeapStats->xSizeOfSmallestFreeBlockInBytes = xMinSize;
+	pxHeapStats->xNumberOfFreeBlocks = xBlocks;
+
+	taskENTER_CRITICAL();
+	{
+		pxHeapStats->xAvailableHeapSpaceInBytes = xFreeBytesRemaining;
+		pxHeapStats->xNumberOfSuccessfulAllocations = xNumberOfSuccessfulAllocations;
+		pxHeapStats->xNumberOfSuccessfulFrees = xNumberOfSuccessfulFrees;
+		pxHeapStats->xMinimumEverFreeBytesRemaining = xMinimumEverFreeBytesRemaining;
+	}
+	taskEXIT_CRITICAL();
+}
+
+#endif
+
 

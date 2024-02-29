@@ -224,6 +224,36 @@ static void prvInitialiseNewTimer(	const char * const pcTimerName,			/*lint !e97
 									Timer_t *pxNewTimer ) PRIVILEGED_FUNCTION;
 /*-----------------------------------------------------------*/
 
+/*****************************************************************
+ * @brief Routine to check if the given task Handle belongs to timer 
+ * task
+ * @param task_handle : handle of the task to be checked
+ * @return 1 if its timer handle, 0 otherwise
+ ****************************************************************/
+
+BaseType_t xIsTimertaskHandle (TaskHandle_t task_handle)
+{
+    (task_handle == xTimerTaskHandle)? pdTRUE: pdFALSE;
+}
+
+/*****************************************************************
+ * @brief Routine to return the timer call back
+ * @param none
+ * @return the callback if exists
+ ****************************************************************/
+TimerCallbackFunction_t xGetHeadTimerCallback (void)
+{
+    Timer_t *pxTimer = ( Timer_t * ) listGET_OWNER_OF_HEAD_ENTRY( pxCurrentTimerList );
+    if( listLIST_IS_EMPTY( pxCurrentTimerList ) )
+    {
+        return NULL;
+    }
+    else
+    {
+        return pxTimer->pxCallbackFunction;
+    }
+}
+
 BaseType_t xTimerCreateTimerTask( void )
 {
 BaseType_t xReturn = pdFAIL;

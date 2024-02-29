@@ -38,6 +38,7 @@ task.h is included from an application file. */
 #include "FreeRTOS.h"
 #include "task.h"
 #include "stream_buffer.h"
+#include "safeAPI.h"
 
 #if( configUSE_TASK_NOTIFICATIONS != 1 )
 	#error configUSE_TASK_NOTIFICATIONS must be set to 1 to build stream_buffer.c
@@ -1100,7 +1101,7 @@ size_t xNextHead, xFirstLength;
 
 	/* Write as many bytes as can be written in the first write. */
 	configASSERT( ( xNextHead + xFirstLength ) <= pxStreamBuffer->xLength );
-	( void ) memcpy( ( void* ) ( &( pxStreamBuffer->pucBuffer[ xNextHead ] ) ), ( const void * ) pucData, xFirstLength ); /*lint !e9087 memcpy() requires void *. */
+	( void ) memscpy( ( void* ) ( &( pxStreamBuffer->pucBuffer[ xNextHead ] ) ), xFirstLength, ( const void * ) pucData, xFirstLength ); /*lint !e9087 memcpy() requires void *. */
 
 	/* If the number of bytes written was less than the number that could be
 	written in the first write... */
@@ -1108,7 +1109,7 @@ size_t xNextHead, xFirstLength;
 	{
 		/* ...then write the remaining bytes to the start of the buffer. */
 		configASSERT( ( xCount - xFirstLength ) <= pxStreamBuffer->xLength );
-		( void ) memcpy( ( void * ) pxStreamBuffer->pucBuffer, ( const void * ) &( pucData[ xFirstLength ] ), xCount - xFirstLength ); /*lint !e9087 memcpy() requires void *. */
+		( void ) memscpy( ( void * ) pxStreamBuffer->pucBuffer, xCount - xFirstLength, ( const void * ) &( pucData[ xFirstLength ] ), xCount - xFirstLength ); /*lint !e9087 memcpy() requires void *. */
 	}
 	else
 	{
@@ -1151,7 +1152,7 @@ size_t xCount, xFirstLength, xNextTail;
 		read.  Asserts check bounds of read and write. */
 		configASSERT( xFirstLength <= xMaxCount );
 		configASSERT( ( xNextTail + xFirstLength ) <= pxStreamBuffer->xLength );
-		( void ) memcpy( ( void * ) pucData, ( const void * ) &( pxStreamBuffer->pucBuffer[ xNextTail ] ), xFirstLength ); /*lint !e9087 memcpy() requires void *. */
+		( void ) memscpy( ( void * ) pucData, xFirstLength, ( const void * ) &( pxStreamBuffer->pucBuffer[ xNextTail ] ), xFirstLength ); /*lint !e9087 memcpy() requires void *. */
 
 		/* If the total number of wanted bytes is greater than the number
 		that could be read in the first read... */
@@ -1159,7 +1160,7 @@ size_t xCount, xFirstLength, xNextTail;
 		{
 			/*...then read the remaining bytes from the start of the buffer. */
 			configASSERT( xCount <= xMaxCount );
-			( void ) memcpy( ( void * ) &( pucData[ xFirstLength ] ), ( void * ) ( pxStreamBuffer->pucBuffer ), xCount - xFirstLength ); /*lint !e9087 memcpy() requires void *. */
+			( void ) memscpy( ( void * ) &( pucData[ xFirstLength ] ), xCount - xFirstLength, ( void * ) ( pxStreamBuffer->pucBuffer ), xCount - xFirstLength ); /*lint !e9087 memcpy() requires void *. */
 		}
 		else
 		{

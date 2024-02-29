@@ -36,6 +36,14 @@
 
 #ifndef MPU_PROTOTYPES_H
 #define MPU_PROTOTYPES_H
+#include <stdint.h>
+#include "freeRTOS.h"
+#include "timers.h"
+#include "queue.h"
+#include "portmacro.h"
+#include "event_groups.h"
+#include "stream_buffer.h"
+
 
 /* MPU versions of tasks.h API functions. */
 BaseType_t MPU_xTaskCreate( TaskFunction_t pxTaskCode, const char * const pcName, const uint16_t usStackDepth, void * const pvParameters, UBaseType_t uxPriority, TaskHandle_t * const pxCreatedTask ) FREERTOS_SYSTEM_CALL;
