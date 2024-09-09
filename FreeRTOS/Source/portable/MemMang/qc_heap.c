@@ -1061,7 +1061,30 @@ unsigned char malloc_init
   return status;
 }
 
+#ifdef DEBUG_MEM_LEAK
+void *pvPortMallocWrapper(size_t size, const char *caller) {
+    void *ptr = pvPortMalloc(size);
+    if (ptr != NULL) {
+      char pcWriteBuffer[200];
+      snprintf((char *)pcWriteBuffer,sizeof(pcWriteBuffer)-strlen(pcWriteBuffer),"Allocated %u bytes from %s\r\n",size,caller);
+		  nt_dbg_print(pcWriteBuffer);
+    }
+    return ptr;
+}
 
+void pvPortFreeWrapper(void *ptr , const char *caller) {
+    extern mem_heap_type amss_mem_heap;
+    mem_heap_type *amss_mem_heap_ptr = &amss_mem_heap;
+    unsigned long used = amss_mem_heap_ptr->used_bytes;
+    vPortFree(ptr);
+    unsigned long delta = used - amss_mem_heap_ptr->used_bytes;
+    if (ptr != NULL) {
+      char pcWriteBuffer[200];
+      snprintf((char *)pcWriteBuffer,sizeof(pcWriteBuffer)-strlen(pcWriteBuffer),"Free %u bytes from %s\r\n",delta,caller);
+		  nt_dbg_print(pcWriteBuffer);
+    }
+}
+#endif
 /*===========================================================================
 
 FUNCTION NT_malloc

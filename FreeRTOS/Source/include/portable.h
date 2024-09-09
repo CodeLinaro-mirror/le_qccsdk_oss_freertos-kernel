@@ -163,6 +163,10 @@ void vPortGetHeapStats( HeapStats_t *pxHeapStats );
 #ifndef CONFIG_HEAP_STATISTIC
 void *pvPortMalloc( size_t xSize ) PRIVILEGED_FUNCTION;
 void vPortFree( void *pv ) PRIVILEGED_FUNCTION;
+#ifdef DEBUG_MEM_LEAK
+void *pvPortMallocWrapper(size_t size, const char *caller) ;
+void pvPortFreeWrapper(void *ptr , const char *caller);
+#endif
 #else
 
 #ifndef pvPortMalloc
