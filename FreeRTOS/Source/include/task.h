@@ -34,6 +34,7 @@
 #endif
 
 #include "list.h"
+#include "fwconfig_cmn.h"
 #include "nt_flags.h"
 
 #ifdef __cplusplus
