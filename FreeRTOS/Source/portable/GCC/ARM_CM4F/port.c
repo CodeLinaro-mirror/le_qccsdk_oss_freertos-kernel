@@ -33,6 +33,11 @@
 #include "FreeRTOS.h"
 #include "task.h"
 
+#ifdef CONFIG_WIFI_FW_COREDUMP_SUPPORT
+#include "err.h"
+extern int g_non_OS;
+#endif
+
 #ifndef __VFP_FP__
 	#error This port can only be used when the project options are configured to enable hardware floating point support.
 #endif
@@ -413,7 +418,10 @@ void vPortEnterCritical( void )
 	assert function also uses a critical section. */
 	if( uxCriticalNesting == 1 )
 	{
-		configASSERT( ( portNVIC_INT_CTRL_REG & portVECTACTIVE_MASK ) == 0 );
+#ifdef CONFIG_WIFI_FW_COREDUMP_SUPPORT
+		if (g_non_OS == 0)
+#endif
+			configASSERT( ( portNVIC_INT_CTRL_REG & portVECTACTIVE_MASK ) == 0 );
 	}
 }
 /*-----------------------------------------------------------*/
