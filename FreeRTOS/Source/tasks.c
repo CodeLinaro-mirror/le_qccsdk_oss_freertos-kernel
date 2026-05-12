@@ -3473,7 +3473,7 @@ static portTASK_FUNCTION( prvIdleTask, pvParameters )
 					portSUPPRESS_TICKS_AND_SLEEP() to be called. */
 					configPRE_SUPPRESS_TICKS_AND_SLEEP_PROCESSING( xExpectedIdleTime );
 					extern uint32_t nt_socpm_slp_time_min;
-					if( xExpectedIdleTime < nt_socpm_slp_time_min )
+					if( xExpectedIdleTime && (xExpectedIdleTime < nt_socpm_slp_time_min) )
 					{
 						traceLOW_POWER_IDLE_BEGIN();
 						portSUPPRESS_TICKS_AND_SLEEP( xExpectedIdleTime );
