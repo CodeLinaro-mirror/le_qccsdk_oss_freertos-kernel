@@ -34,6 +34,11 @@
 #include "FreeRTOS.h"
 #include "task.h"
 
+#ifdef CONFIG_WIFI_FW_COREDUMP_SUPPORT
+    #include "err.h"
+    extern int g_non_OS;
+#endif
+
 #ifndef __VFP_FP__
     #error This port can only be used when the project options are configured to enable hardware floating point support.
 #endif
@@ -88,7 +93,7 @@
 #define portASPEN_AND_LSPEN_BITS              ( 0x3UL << 30UL )
 
 /* Constants required to set up the initial stack. */
-#define portINITIAL_XPSR                      ( 0x01000000 )
+#define portINITIAL_XPSR                      ( 0x01000000UL )
 #define portINITIAL_EXC_RETURN                ( 0xfffffffd )
 
 /* The systick is a 24-bit counter. */
@@ -419,6 +424,9 @@ void vPortEnterCritical( void )
      * assert function also uses a critical section. */
     if( uxCriticalNesting == 1 )
     {
+        #ifdef CONFIG_WIFI_FW_COREDUMP_SUPPORT
+            if( g_non_OS == 0 )
+        #endif
         configASSERT( ( portNVIC_INT_CTRL_REG & portVECTACTIVE_MASK ) == 0 );
     }
 }
@@ -435,6 +443,14 @@ void vPortExitCritical( void )
     }
 }
 /*-----------------------------------------------------------*/
+
+/*
+ * Dummy function added to avoid compiler optimizing out the symbol used in inline assembly
+ */
+static void __attribute__( ( used ) ) vPortNoOptimize()
+{
+    vTaskSwitchContext();
+}
 
 void xPortPendSVHandler( void )
 {
@@ -500,13 +516,20 @@ void xPortSysTickHandler( void )
      * save and then restore the interrupt mask value as its value is already
      * known. */
     portDISABLE_INTERRUPTS();
+    traceISR_ENTER();
     {
         /* Increment the RTOS tick. */
         if( xTaskIncrementTick() != pdFALSE )
         {
+            traceISR_EXIT_TO_SCHEDULER();
+
             /* A context switch is required.  Context switching is performed in
              * the PendSV interrupt.  Pend the PendSV interrupt. */
             portNVIC_INT_CTRL_REG = portNVIC_PENDSVSET_BIT;
+        }
+        else
+        {
+            traceISR_EXIT();
         }
     }
     portENABLE_INTERRUPTS();

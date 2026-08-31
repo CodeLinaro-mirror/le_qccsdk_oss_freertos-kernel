@@ -43,6 +43,7 @@
  * These settings should not be altered.
  *-----------------------------------------------------------
  */
+    #include "FreeRTOSConfig.h"
 
 /* Type definitions. */
     #define portCHAR          char
@@ -52,6 +53,10 @@
     #define portSHORT         short
     #define portSTACK_TYPE    uint32_t
     #define portBASE_TYPE     long
+
+/*rcli*/
+    #define pdFALSE           ( ( BaseType_t ) 0 )
+    #define pdTRUE            ( ( BaseType_t ) 1 )
 
     typedef portSTACK_TYPE   StackType_t;
     typedef long             BaseType_t;
@@ -91,7 +96,7 @@
 
     #define portNVIC_INT_CTRL_REG     ( *( ( volatile uint32_t * ) 0xe000ed04 ) )
     #define portNVIC_PENDSVSET_BIT    ( 1UL << 28UL )
-    #define portEND_SWITCHING_ISR( xSwitchRequired )    do { if( xSwitchRequired != pdFALSE ) portYIELD(); } while( 0 )
+    #define portEND_SWITCHING_ISR( xSwitchRequired )    do { if( xSwitchRequired != pdFALSE ) { traceISR_EXIT_TO_SCHEDULER(); portYIELD(); } else { traceISR_EXIT(); } } while( 0 )
     #define portYIELD_FROM_ISR( x )                     portEND_SWITCHING_ISR( x )
 /*-----------------------------------------------------------*/
 
@@ -128,6 +133,10 @@
 
     #if configUSE_PORT_OPTIMISED_TASK_SELECTION == 1
 
+/* peter to avoid warning */
+        #pragma GCC diagnostic push
+        #pragma GCC diagnostic ignored "-Wattributes"
+        #pragma GCC diagnostic ignored "-Wunused-function"
 /* Generic helper function. */
         __attribute__( ( always_inline ) ) static inline uint8_t ucPortCountLeadingZeros( uint32_t ulBitmap )
         {
@@ -137,6 +146,7 @@
 
             return ucReturn;
         }
+        #pragma GCC diagnostic pop
 
 /* Check the configuration. */
         #if ( configMAX_PRIORITIES > 32 )
@@ -169,8 +179,13 @@
         #define portFORCE_INLINE    inline __attribute__( ( always_inline ) )
     #endif
 
+/* peter to avoid warning */
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wattributes"
+    #pragma GCC diagnostic ignored "-Wunused-function"
     portFORCE_INLINE static BaseType_t xPortIsInsideInterrupt( void )
     {
+        #pragma GCC diagnostic pop
         uint32_t ulCurrentInterrupt;
         BaseType_t xReturn;
 
@@ -191,8 +206,13 @@
 
 /*-----------------------------------------------------------*/
 
+/* peter to avoid warning */
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wattributes"
+    #pragma GCC diagnostic ignored "-Wunused-function"
     portFORCE_INLINE static void vPortRaiseBASEPRI( void )
     {
+        #pragma GCC diagnostic pop
         uint32_t ulNewBASEPRI;
 
         __asm volatile
@@ -207,8 +227,13 @@
 
 /*-----------------------------------------------------------*/
 
+/* peter to avoid warning */
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wattributes"
+    #pragma GCC diagnostic ignored "-Wunused-function"
     portFORCE_INLINE static uint32_t ulPortRaiseBASEPRI( void )
     {
+        #pragma GCC diagnostic pop
         uint32_t ulOriginalBASEPRI, ulNewBASEPRI;
 
         __asm volatile
@@ -227,8 +252,13 @@
     }
 /*-----------------------------------------------------------*/
 
+/* peter to avoid warning */
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wattributes"
+    #pragma GCC diagnostic ignored "-Wunused-function"
     portFORCE_INLINE static void vPortSetBASEPRI( uint32_t ulNewMaskValue )
     {
+        #pragma GCC diagnostic pop
         __asm volatile
         (
             "	msr basepri, %0	"::"r" ( ulNewMaskValue ) : "memory"

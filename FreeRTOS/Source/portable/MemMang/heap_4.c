@@ -44,6 +44,18 @@
 #include "FreeRTOS.h"
 #include "task.h"
 
+#include "nt_flags.h"
+
+extern unsigned char _ln_RAM_addr_heap_start__;
+
+#ifdef PLATFORM_FERMION
+    #define HEAP_END_ADDR    ( 0x9FFFF )
+#else
+    #define HEAP_END_ADDR    ( 0x7FFFF )
+#endif /* PLATFORM_FERMION */
+
+#if ( NT_FN_QC_HEAP == 0 )
+
 #undef MPU_WRAPPERS_INCLUDED_FROM_API_FILE
 
 #if ( configSUPPORT_DYNAMIC_ALLOCATION == 0 )
@@ -63,7 +75,9 @@
 * heap - probably so it can be placed in a special segment or address. */
     extern uint8_t ucHeap[ configTOTAL_HEAP_SIZE ];
 #else
-    PRIVILEGED_DATA static uint8_t ucHeap[ configTOTAL_HEAP_SIZE ];
+/*	FreeRTOS heap declaration overridden for Neutrino	*/
+/* Beginning address of the heap is provided by the linker */
+    PRIVILEGED_DATA static uint8_t * ucHeap __attribute__( ( section( ".heap" ) ) ) = &_ln_RAM_addr_heap_start__;
 #endif /* configAPPLICATION_ALLOCATED_HEAP */
 
 /* Define the linked list structure.  This is used to link free blocks in order
@@ -72,7 +86,19 @@ typedef struct A_BLOCK_LINK
 {
     struct A_BLOCK_LINK * pxNextFreeBlock; /*<< The next free block in the list. */
     size_t xBlockSize;                     /*<< The size of the free block. */
+    #ifdef NT_TU_HEAP_STATS
+        UBaseType_t TaskId;                 /* Added for identifying the task performing malloc and free. */
+    #endif
 } BlockLink_t;
+
+#ifdef NT_TU_HEAP_STATS
+    UBaseType_t ulTaskId = 0;               /* Used for updating/retrieving the Task ID into heap structure */
+    static int curr_total_usage = 0;        /* current usage from total heap */
+    int max_total_usage = 0;                /* Maximum usage from total heap */
+    int CurrTotalUsagePerStep = 0;
+    int MaxTotalUsagePerStep = 0;
+    UBaseType_t SchedulerState = NULL;
+#endif /* NT_TU_HEAP_STATS */
 
 /*-----------------------------------------------------------*/
 
@@ -220,6 +246,37 @@ void * pvPortMalloc( size_t xWantedSize )
                     }
 
                     xFreeBytesRemaining -= pxBlock->xBlockSize;
+                    #ifdef NT_TU_HEAP_STATS
+                        curr_total_usage += pxBlock->xBlockSize;  /* Updating total heap usage */
+
+                        if( max_total_usage < curr_total_usage )  /* Updating highest heap usage */
+                        {
+                            max_total_usage = curr_total_usage;
+                        }
+
+                        CurrTotalUsagePerStep += pxBlock->xBlockSize;
+
+                        if( MaxTotalUsagePerStep < CurrTotalUsagePerStep )
+                        {
+                            MaxTotalUsagePerStep = CurrTotalUsagePerStep;
+                        }
+
+                        /* Get the Task ID and update in the heap structure before updating the heap utility table */
+                        ulTaskId = xTaskGetCurrentTaskId();
+                        SchedulerState = xTaskGetSchedulerState();
+
+                        /* Retrieving the Task Id from the heap structure to free the memory allocated for the respective task */
+                        if( SchedulerState == taskSCHEDULER_NOT_STARTED )
+                        {
+                            ulTaskId = 0;
+                            nt_table_update_malloc( pxBlock->xBlockSize, SchedulerState, ulTaskId );
+                        }
+                        else
+                        {
+                            pxBlock->TaskId = ulTaskId;
+                            nt_table_update_malloc( pxBlock->xBlockSize, SchedulerState, ulTaskId );
+                        }
+                    #endif /* NT_TU_HEAP_STATS */
 
                     if( xFreeBytesRemaining < xMinimumEverFreeBytesRemaining )
                     {
@@ -304,6 +361,25 @@ void vPortFree( void * pv )
                 {
                     /* Add this block to the list of free blocks. */
                     xFreeBytesRemaining += pxLink->xBlockSize;
+                    #ifdef NT_TU_HEAP_STATS
+                        curr_total_usage -= pxLink->xBlockSize;  /* Updating total heap usage */
+
+                        CurrTotalUsagePerStep -= pxLink->xBlockSize;
+
+                        SchedulerState = xTaskGetSchedulerState();
+
+                        /* Retrieving the Task Id from the heap structure to free the memory allocated for the respective task */
+                        if( SchedulerState == taskSCHEDULER_NOT_STARTED )
+                        {
+                            ulTaskId = 0;
+                            nt_table_update_free( pxLink->xBlockSize, SchedulerState, ulTaskId );
+                        }
+                        else
+                        {
+                            ulTaskId = pxLink->TaskId;
+                            nt_table_update_free( pxLink->xBlockSize, SchedulerState, ulTaskId );
+                        }
+                    #endif /* NT_TU_HEAP_STATS */
                     traceFREE( pv, pxLink->xBlockSize );
                     prvInsertBlockIntoFreeList( ( ( BlockLink_t * ) pxLink ) );
                     xNumberOfSuccessfulFrees++;
@@ -346,7 +422,7 @@ static void prvHeapInit( void ) /* PRIVILEGED_FUNCTION */
     BlockLink_t * pxFirstFreeBlock;
     uint8_t * pucAlignedHeap;
     size_t uxAddress;
-    size_t xTotalHeapSize = configTOTAL_HEAP_SIZE;
+    size_t xTotalHeapSize = HEAP_END_ADDR - ( uint32_t ) &_ln_RAM_addr_heap_start__;
 
     /* Ensure the heap starts on a correctly aligned boundary. */
     uxAddress = ( size_t ) ucHeap;
@@ -502,3 +578,5 @@ void vPortGetHeapStats( HeapStats_t * pxHeapStats )
     }
     taskEXIT_CRITICAL();
 }
+
+#endif /* NT_FN_QC_HEAP == 0 */

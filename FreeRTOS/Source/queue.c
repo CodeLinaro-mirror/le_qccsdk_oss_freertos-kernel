@@ -37,6 +37,7 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "queue.h"
+#include "safeAPI.h"
 
 #if ( configUSE_CO_ROUTINES == 1 )
     #include "croutine.h"
@@ -2187,7 +2188,7 @@ static BaseType_t prvCopyDataToQueue( Queue_t * const pxQueue,
     }
     else if( xPosition == queueSEND_TO_BACK )
     {
-        ( void ) memcpy( ( void * ) pxQueue->pcWriteTo, pvItemToQueue, ( size_t ) pxQueue->uxItemSize ); /*lint !e961 !e418 !e9087 MISRA exception as the casts are only redundant for some ports, plus previous logic ensures a null pointer can only be passed to memcpy() if the copy size is 0.  Cast to void required by function signature and safe as no alignment requirement and copy length specified in bytes. */
+        ( void ) memscpy( ( void * ) pxQueue->pcWriteTo, ( size_t ) pxQueue->uxItemSize, pvItemToQueue, ( size_t ) pxQueue->uxItemSize ); /*lint !e961 !e418 !e9087 MISRA exception as the casts are only redundant for some ports, plus previous logic ensures a null pointer can only be passed to memcpy() if the copy size is 0.  Cast to void required by function signature and safe as no alignment requirement and copy length specified in bytes. */
         pxQueue->pcWriteTo += pxQueue->uxItemSize;                                                       /*lint !e9016 Pointer arithmetic on char types ok, especially in this use case where it is the clearest way of conveying intent. */
 
         if( pxQueue->pcWriteTo >= pxQueue->u.xQueue.pcTail )                                             /*lint !e946 MISRA exception justified as comparison of pointers is the cleanest solution. */
@@ -2201,7 +2202,7 @@ static BaseType_t prvCopyDataToQueue( Queue_t * const pxQueue,
     }
     else
     {
-        ( void ) memcpy( ( void * ) pxQueue->u.xQueue.pcReadFrom, pvItemToQueue, ( size_t ) pxQueue->uxItemSize ); /*lint !e961 !e9087 !e418 MISRA exception as the casts are only redundant for some ports.  Cast to void required by function signature and safe as no alignment requirement and copy length specified in bytes.  Assert checks null pointer only used when length is 0. */
+        ( void ) memscpy( ( void * ) pxQueue->u.xQueue.pcReadFrom, ( size_t ) pxQueue->uxItemSize, pvItemToQueue, ( size_t ) pxQueue->uxItemSize ); /*lint !e961 !e9087 !e418 MISRA exception as the casts are only redundant for some ports.  Cast to void required by function signature and safe as no alignment requirement and copy length specified in bytes.  Assert checks null pointer only used when length is 0. */
         pxQueue->u.xQueue.pcReadFrom -= pxQueue->uxItemSize;
 
         if( pxQueue->u.xQueue.pcReadFrom < pxQueue->pcHead ) /*lint !e946 MISRA exception justified as comparison of pointers is the cleanest solution. */
@@ -2256,7 +2257,7 @@ static void prvCopyDataFromQueue( Queue_t * const pxQueue,
             mtCOVERAGE_TEST_MARKER();
         }
 
-        ( void ) memcpy( ( void * ) pvBuffer, ( void * ) pxQueue->u.xQueue.pcReadFrom, ( size_t ) pxQueue->uxItemSize ); /*lint !e961 !e418 !e9087 MISRA exception as the casts are only redundant for some ports.  Also previous logic ensures a null pointer can only be passed to memcpy() when the count is 0.  Cast to void required by function signature and safe as no alignment requirement and copy length specified in bytes. */
+        ( void ) memscpy( ( void * ) pvBuffer, ( size_t ) pxQueue->uxItemSize, ( void * ) pxQueue->u.xQueue.pcReadFrom, ( size_t ) pxQueue->uxItemSize ); /*lint !e961 !e418 !e9087 MISRA exception as the casts are only redundant for some ports.  Also previous logic ensures a null pointer can only be passed to memcpy() when the count is 0.  Cast to void required by function signature and safe as no alignment requirement and copy length specified in bytes. */
     }
 }
 /*-----------------------------------------------------------*/
@@ -2598,7 +2599,7 @@ BaseType_t xQueueIsQueueFullFromISR( const QueueHandle_t xQueue )
                 }
 
                 --( pxQueue->uxMessagesWaiting );
-                ( void ) memcpy( ( void * ) pvBuffer, ( void * ) pxQueue->u.xQueue.pcReadFrom, ( unsigned ) pxQueue->uxItemSize );
+                ( void ) memscpy( ( void * ) pvBuffer, ( unsigned ) pxQueue->uxItemSize, ( void * ) pxQueue->u.xQueue.pcReadFrom, ( unsigned ) pxQueue->uxItemSize );
 
                 xReturn = pdPASS;
 
@@ -2712,7 +2713,7 @@ BaseType_t xQueueIsQueueFullFromISR( const QueueHandle_t xQueue )
             }
 
             --( pxQueue->uxMessagesWaiting );
-            ( void ) memcpy( ( void * ) pvBuffer, ( void * ) pxQueue->u.xQueue.pcReadFrom, ( unsigned ) pxQueue->uxItemSize );
+            ( void ) memscpy( ( void * ) pvBuffer, ( unsigned ) pxQueue->uxItemSize, ( void * ) pxQueue->u.xQueue.pcReadFrom, ( unsigned ) pxQueue->uxItemSize );
 
             if( ( *pxCoRoutineWoken ) == pdFALSE )
             {

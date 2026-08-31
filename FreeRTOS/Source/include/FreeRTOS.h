@@ -56,13 +56,17 @@
 /* *INDENT-ON* */
 
 /* Application specific configuration options. */
-#include "FreeRTOSConfig.h"
 
 /* Basic FreeRTOS definitions. */
 #include "projdefs.h"
 
 /* Definitions specific to the port being used. */
 #include "portable.h"
+#include "FreeRTOSConfig.h"
+
+#ifdef ENABLE_SEGGER_SYSTEMVIEW
+    #include "SEGGER_SYSVIEW_FreeRTOS.h"
+#endif
 
 /* Must be defaulted before configUSE_NEWLIB_REENTRANT is used below. */
 #ifndef configUSE_NEWLIB_REENTRANT
@@ -184,6 +188,10 @@
 
 #ifndef INCLUDE_uxTaskGetStackHighWaterMark2
     #define INCLUDE_uxTaskGetStackHighWaterMark2    0
+#endif
+
+#ifndef INCLUDE_pxTaskGetStackStart
+    #define INCLUDE_pxTaskGetStackStart    0
 #endif
 
 #ifndef INCLUDE_eTaskGetState
@@ -452,6 +460,22 @@
     #define tracePOST_MOVED_TASK_TO_READY_STATE( pxTCB )
 #endif
 
+#ifndef traceREADDED_TASK_TO_READY_STATE
+    #define traceREADDED_TASK_TO_READY_STATE( pxTCB )    traceMOVED_TASK_TO_READY_STATE( pxTCB )
+#endif
+
+#ifndef traceMOVED_TASK_TO_DELAYED_LIST
+    #define traceMOVED_TASK_TO_DELAYED_LIST()
+#endif
+
+#ifndef traceMOVED_TASK_TO_OVERFLOW_DELAYED_LIST
+    #define traceMOVED_TASK_TO_OVERFLOW_DELAYED_LIST()
+#endif
+
+#ifndef traceMOVED_TASK_TO_SUSPENDED_LIST
+    #define traceMOVED_TASK_TO_SUSPENDED_LIST( pxTCB )
+#endif
+
 #ifndef traceQUEUE_CREATE
     #define traceQUEUE_CREATE( pxNewQueue )
 #endif
@@ -700,6 +724,18 @@
     #define traceTASK_NOTIFY_GIVE_FROM_ISR( uxIndexToNotify )
 #endif
 
+#ifndef traceISR_EXIT_TO_SCHEDULER
+    #define traceISR_EXIT_TO_SCHEDULER()
+#endif
+
+#ifndef traceISR_EXIT
+    #define traceISR_EXIT()
+#endif
+
+#ifndef traceISR_ENTER
+    #define traceISR_ENTER()
+#endif
+
 #ifndef traceSTREAM_BUFFER_CREATE_FAILED
     #define traceSTREAM_BUFFER_CREATE_FAILED( xIsMessageBuffer )
 #endif
@@ -892,7 +928,7 @@
 
 #ifndef configSUPPORT_STATIC_ALLOCATION
     /* Defaults to 0 for backward compatibility. */
-    #define configSUPPORT_STATIC_ALLOCATION    0
+    #define configSUPPORT_STATIC_ALLOCATION    1
 #endif
 
 #ifndef configSUPPORT_DYNAMIC_ALLOCATION

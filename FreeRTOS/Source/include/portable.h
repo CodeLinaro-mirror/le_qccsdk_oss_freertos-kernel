@@ -172,8 +172,49 @@ void vPortGetHeapStats( HeapStats_t * pxHeapStats );
 /*
  * Map to the memory management routines required for the port.
  */
+#ifndef CONFIG_HEAP_STATISTIC
 void * pvPortMalloc( size_t xSize ) PRIVILEGED_FUNCTION;
 void vPortFree( void * pv ) PRIVILEGED_FUNCTION;
+    #ifdef DEBUG_MEM_LEAK
+        void * pvPortMallocWrapper( size_t size,
+                                    const char * caller );
+        void pvPortFreeWrapper( void * ptr,
+                                const char * caller );
+    #endif
+#else /* CONFIG_HEAP_STATISTIC */
+
+    #ifndef pvPortMalloc
+        #ifndef mem_heap_statistics_type
+            #define mem_heap_statistics_type    mem_heap_statistics_type
+            typedef struct mem_heap_statistics
+            {
+                const char * function;
+                unsigned int req_size;
+            } mem_heap_statistics_type;
+        #endif
+
+        extern unsigned int heap_statistics_index;
+        extern mem_heap_statistics_type heap_statistics[];
+
+        void * __pvPortMalloc( size_t xWantedSize );
+
+        #define pvPortMalloc( size )                                                                    \
+    ( ( { heap_statistics[ heap_statistics_index % NT_HEAP_RCD_CNT ].function = __FUNCTION__;            \
+          heap_statistics[ heap_statistics_index % NT_HEAP_RCD_CNT ].req_size = size;                    \
+          heap_statistics_index++; } ),                                                                 \
+      ( __pvPortMalloc( size ) ) )
+    #endif /* pvPortMalloc */
+
+    #ifndef vPortFree
+        extern unsigned int heap_statistics_free_index;
+        extern const char * heap_statistics_free[];
+        void __vPortFree( void * ptr );
+        #define vPortFree( ptr )                                                                        \
+    ( ( { heap_statistics_free[ heap_statistics_free_index % NT_HEAP_RCD_CNT ] = __FUNCTION__;           \
+          heap_statistics_free_index++; } ),                                                            \
+      ( __vPortFree( ptr ) ) )
+    #endif /* vPortFree */
+#endif /* CONFIG_HEAP_STATISTIC */
 void vPortInitialiseBlocks( void ) PRIVILEGED_FUNCTION;
 size_t xPortGetFreeHeapSize( void ) PRIVILEGED_FUNCTION;
 size_t xPortGetMinimumEverFreeHeapSize( void ) PRIVILEGED_FUNCTION;

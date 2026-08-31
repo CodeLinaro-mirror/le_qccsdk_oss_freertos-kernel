@@ -35,6 +35,8 @@
 #endif
 
 #include "list.h"
+#include "fwconfig_cmn.h"
+#include "nt_flags.h"
 
 /* *INDENT-OFF* */
 #ifdef __cplusplus
@@ -162,6 +164,9 @@ typedef struct xTASK_STATUS
     configRUN_TIME_COUNTER_TYPE ulRunTimeCounter; /* The total run time allocated to the task so far, as defined by the run time stats clock.  See https://www.FreeRTOS.org/rtos-run-time-stats.html.  Only valid when configGENERATE_RUN_TIME_STATS is defined as 1 in FreeRTOSConfig.h. */
     StackType_t * pxStackBase;                    /* Points to the lowest address of the task's stack area. */
     configSTACK_DEPTH_TYPE usStackHighWaterMark;  /* The minimum amount of stack space that has remained for the task since the task was created.  The closer this value is to zero the closer the task has come to overflowing its stack. */
+    #ifdef NT_TU_TASK_STATS
+        StackType_t CurrStackUsage;
+    #endif
 } TaskStatus_t;
 
 /* Possible return values for eTaskConfirmSleepModeStatus(). */
@@ -1561,6 +1566,25 @@ UBaseType_t uxTaskGetStackHighWaterMark( TaskHandle_t xTask ) PRIVILEGED_FUNCTIO
  */
 configSTACK_DEPTH_TYPE uxTaskGetStackHighWaterMark2( TaskHandle_t xTask ) PRIVILEGED_FUNCTION;
 
+/**
+ * task.h
+ * <PRE>uint8_t* pxTaskGetStackStart( TaskHandle_t xTask);</PRE>
+ *
+ * INCLUDE_pxTaskGetStackStart must be set to 1 in FreeRTOSConfig.h for
+ * this function to be available.
+ *
+ * Returns the start of the stack associated with xTask.  That is,
+ * the highest stack memory address on architectures where the stack grows down
+ * from high memory, and the lowest memory address on architectures where the
+ * stack grows up from low memory.
+ *
+ * @param xTask Handle of the task associated with the stack returned.
+ * Set xTask to NULL to return the stack of the calling task.
+ *
+ * @return A pointer to the start of the stack.
+ */
+uint8_t * pxTaskGetStackStart( TaskHandle_t xTask ) PRIVILEGED_FUNCTION;
+
 /* When using trace macros it is sometimes necessary to include task.h before
  * FreeRTOS.h.  When this is done TaskHookFunction_t will not yet have been defined,
  * so the following two prototypes will cause a compilation error.  This can be
@@ -1852,7 +1876,25 @@ UBaseType_t uxTaskGetSystemState( TaskStatus_t * const pxTaskStatusArray,
  * \defgroup vTaskList vTaskList
  * \ingroup TaskUtils
  */
-void vTaskList( char * pcWriteBuffer ) PRIVILEGED_FUNCTION; /*lint !e971 Unqualified char types are allowed for strings and single characters only. */
+size_t vTaskList( char * pcWriteBuffer ) PRIVILEGED_FUNCTION; /*lint !e971 Unqualified char types are allowed for strings and single characters only. */
+/* peter return type changed */
+
+/**
+ * task. h
+ * <PRE>size_t xStackUtilized(void);</PRE>
+ *
+ * configUSE_TRACE_FACILITY and configUSE_STATS_FORMATTING_FUNCTIONS must
+ * both be defined as 1 for this function to be available.
+ *
+ * NOTE 1: This function will disable interrupts for its duration.  It is
+ * not intended for normal application runtime use but as a debug aid.
+ *
+ * @return size_t  Stack Used by all the current listed task
+ *
+ * \defgroup xStackUtilized xStackUtilized
+ * \ingroup TaskUtils
+ */
+size_t xStackUtilized( void ) PRIVILEGED_FUNCTION; /*lint !e971 Unqualified char types are allowed for strings and single characters only. */
 
 /**
  * task. h
@@ -3018,6 +3060,11 @@ TickType_t uxTaskResetEventItemValue( void ) PRIVILEGED_FUNCTION;
  */
 TaskHandle_t xTaskGetCurrentTaskHandle( void ) PRIVILEGED_FUNCTION;
 
+#ifdef NT_TU_HEAP_STATS
+/* Returns the Task ID of the calling task */
+    UBaseType_t xTaskGetCurrentTaskId( void );
+#endif
+
 /*
  * Shortcut used by the queue implementation to prevent unnecessary call to
  * taskYIELD();
@@ -3102,6 +3149,24 @@ TaskHandle_t pvTaskIncrementMutexHeldCount( void ) PRIVILEGED_FUNCTION;
  * section.
  */
 void vTaskInternalSetTimeOutState( TimeOut_t * const pxTimeOut ) PRIVILEGED_FUNCTION;
+
+/*****************************************************************
+* @brief Routine to get the owner of the delayed list head
+*
+* @param None
+* @return TaskHandle_t: TCB of the owner of the head of delayed list
+****************************************************************/
+TaskHandle_t xGetDelayedListHeadOwner( void );
+
+/*****************************************************************
+ * @brief Routine to get the next unblock time of the task after the
+ * head of the list and calculate the sleep time appropriately
+ *
+ * @param None
+ * @return: next sleep time : next sleep time. Returns portMAX_DELAY
+ * if the list is empty or there is only one entry
+ ****************************************************************/
+TickType_t xGetNextSleepTime( void );
 
 
 /* *INDENT-OFF* */

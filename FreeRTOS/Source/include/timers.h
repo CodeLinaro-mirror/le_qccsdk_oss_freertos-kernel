@@ -1347,6 +1347,23 @@ BaseType_t xTimerGenericCommand( TimerHandle_t xTimer,
 
 #endif
 
+/*****************************************************************
+* @brief Routine to check if the given task Handle belongs to timer
+* task
+* @param task_handle : handle of the task to be checked
+* @return 1 if its timer handle, 0 otherwise
+****************************************************************/
+
+BaseType_t xIsTimertaskHandle( TaskHandle_t task_handle );
+
+/**************************************************************
+ * prvGetHeadTimerCallback
+ * @brief return the NT timer callback
+ * @param None
+ * @return Timer callback
+ *************************************************************/
+TimerCallbackFunction_t xGetHeadTimerCallback( void );
+
 /* *INDENT-OFF* */
 #ifdef __cplusplus
     }
